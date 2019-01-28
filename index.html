@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>scEv - test</title>
+  <style>
+  *{margin: 0;padding: 0;box-sizing: border-box;}
+    body{
+      font-size:62.5%;
+      counter-reset: i;
+      /*scroll-snap-type: y proximity;*/
+    }
+    section{min-height: 100vh;}
+    section:after{
+      counter-increment: i;
+      content: 'Section  #'counters(i, '---');
+      display: block;
+      width: 100%;
+      line-height: 100vh;
+      font-family: 'Segoe UI';
+      font-size: 4.2em;
+      text-align: center;
+      /*scroll-snap-align: start;*/
+    }
+    section:nth-of-type(even){background:#b9b9b9;}
+  </style>
+</head>
+<body>
+  <section class="sboub _xd1"></section>
+  <section class="sboub _xd2"></section>
+  <section class="sboub _xdd1"></section>
+  <section class="sboub2 _xd56"></section>
+  <section class="sboub2 _xd165"></section>
+  <script src="js/scEvt.js" ></script>
+  <script>
+    var test = new ScrollUtil({
+      'anchor' : false,
+      'targetedElements' : {
+        '.sboub' : {
+          '_visible' : {'activeStateClass' : 'is-visible'},
+          '_touching' : {'trigger' : 50, 'activeStateClass' : 'is-touching', 'funcName' : 'anyFuncName'}
+        },
+        '.sboub2' : {
+          '_visible' : {'trigger' : 50, 'activeStateClass' : 'is-visible2'}
+        }
+      }
+    });
+    function anyFuncName(activeElement){
+      console.log(test.scrollPos)
+      // console.log(Math.abs((activeElement.offsetTop - (test.scrollPos + activeElement._touching.triggerLine))))
+    }
+  </script>
+</body>
+</html>
