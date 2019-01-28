@@ -51,12 +51,22 @@ ScrollUtil.prototype.scrollMap = function(evt, self){
           if(e._touching.funcName){ window[e._touching.funcName](e); }
           // add activeStateClass as a css class if given
           if(e._touching.activeStateClass){ e.classList.add(e._touching.activeStateClass); }
+          // wip..
+          if(e._touching.ref){
+            var target = document.querySelector(e._touching.ref).querySelectorAll("a[href='#"+e.id+"']")[0];
+            target.classList.add(e._touching.activeStateClass);
+          }
           // set boolean on object
           e.isTouchingTrigger = true;
           // build an array containing each elements to activate
           if(!elementOk){ self.activeElements.push(e); elementOk = true; }
         }else{
           if(e._touching.activeStateClass){ e.classList.remove(e._touching.activeStateClass); }
+          //
+          if(e._touching.ref){
+            var target = document.querySelector(e._touching.ref).querySelectorAll("a[href='#"+e.id+"']")[0];
+            target.classList.remove(e._touching.activeStateClass);
+          }
         }
 
       }
