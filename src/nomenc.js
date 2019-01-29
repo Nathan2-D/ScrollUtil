@@ -1,6 +1,6 @@
 //
 var test = new ScrollUtil({
-  'anchor' : false,
+  'smoothScroll' : true,
   'targetedElements' : {
     '.myCustomElements' : {
       '_visible' : {'activeStateClass' : 'is-visible'}, // aplly css class to element visible within viewport

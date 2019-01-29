@@ -1,12 +1,6 @@
-var w = window;
-var d = document;
-var dE = d.documentElement;
-var b = dE.getElementsByTagName('body')[0];
-var activatedElement;
-var allObjects = [];
 var defaultConfig = {
-  'windowWidth' :  w.innerWidth|| dE.clientWidth|| b.clientWidth,
-  'windowHeight' :  w.innerHeight|| dE.clientHeight|| b.clientHeight,
+  'windowWidth' :  window.innerWidth|| document.documentElement.clientWidth|| document.documentElement.getElementsByTagName('body')[0].clientWidth,
+  'windowHeight' :  window.innerHeight|| document.documentElement.clientHeight|| document.documentElement.getElementsByTagName('body')[0].clientHeight,
   'hasTargets' : false,
   'allElements' : [],
   'activeElements' : []
@@ -14,21 +8,27 @@ var defaultConfig = {
 const nodeListToArray = nodeList => [...nodeList];
 
 function ScrollUtil(userConfig){
-  // 'import' default config
+  // 'import' default & user config
   for (dC in defaultConfig) { this[dC] = defaultConfig[dC] }
-  // 'import' user config, overwrite default if needed
   for (uC in userConfig) { this[uC] = userConfig[uC] }
+
+  // set smoothScroll if needed
+  if(this.smoothScroll){ this.smoothScrolling.init(); }
 
   // retrieve targeted elements / set custom properties given on configuration / store them inside this.allElements
   this.setallElements();
 
-  w.addEventListener('scroll', (evt) => { this.scrollMap(evt, this)  }, { capture: false, passive: true});
+  // call the map function once, to set elements state if needed
+  this.scrollMap(this);
+
+  // add listener calling map function on scroll
+  window.addEventListener('scroll', () => { this.scrollMap(this)  }, { capture: false, passive: true});
 }
-
-ScrollUtil.prototype.scrollMap = function(evt, self){
-
+/*
+* ScrollMap
+*/
+ScrollUtil.prototype.scrollMap = function(self){
   this.updateScrollPos();
-
   if(!self.hasTargets){
     elementOk = false
     self.allElements.map(function(e){
@@ -41,19 +41,22 @@ ScrollUtil.prototype.scrollMap = function(evt, self){
           if(e._visible.activeStateClass){ e.classList.remove(e._visible.activeStateClass); }
         }
       }
-      if(e._touching && e._touching.trigger){
+      if(e._touching){
         // calculate & set trigger line if needed
-        if(e._touching.triggerLine == undefined){e._touching.triggerLine = ((self.windowHeight/100) * e._touching.trigger)}
+        // default value for trigger if not specified, (0 causing issues -> el doesnt take his correct state when scroll=0 & when scroll=maxScrollAvailable)
+        if(e._touching.trigger == undefined){ e._touching.trigger = 1; }
+        else{ if(e._touching.triggerLine == undefined){e._touching.triggerLine = ((self.windowHeight/100) * e._touching.trigger)} }
 
         if(self.isTouchingTrigger(e)){
           // found an element meeting condition to be activated
           // call function if given
           if(e._touching.funcName){ window[e._touching.funcName](e); }
-          // add activeStateClass as a css class if given
+          // add activeStateClass as a css class if given or default class if not
+          if(!e._touching.activeStateClass){ e._touching.activeStateClass = 'is-touching' }
           if(e._touching.activeStateClass){ e.classList.add(e._touching.activeStateClass); }
           // wip..
-          if(e._touching.ref){
-            var target = document.querySelector(e._touching.ref).querySelectorAll("a[href='#"+e.id+"']")[0];
+          if(e._touching.pairingWith){
+            var target = document.querySelector(e._touching.pairingWith).querySelectorAll("a[href='#"+e.id+"']")[0];
             target.classList.add(e._touching.activeStateClass);
           }
           // set boolean on object
@@ -63,24 +66,20 @@ ScrollUtil.prototype.scrollMap = function(evt, self){
         }else{
           if(e._touching.activeStateClass){ e.classList.remove(e._touching.activeStateClass); }
           //
-          if(e._touching.ref){
-            var target = document.querySelector(e._touching.ref).querySelectorAll("a[href='#"+e.id+"']")[0];
+          if(e._touching.pairingWith){
+            var target = document.querySelector(e._touching.pairingWith).querySelectorAll("a[href='#"+e.id+"']")[0];
             target.classList.remove(e._touching.activeStateClass);
           }
         }
 
       }
-
       // if(e._above){     }
       // if(e._below){     }
-
     });
   }
-
   // if activeElements contains at least one element we can assume we have at least one target
   // so we set our boolean, to stop pushing elements in our active elements array
   if(!this.checkTargets()){ this.sethasTargets(true) }
-
   // function activated one or more elements, lets first check if they still meet the condition to be active & update boolean
   if(self.hasTargets){
     self.activeElements.map(function(activeElement){
@@ -104,10 +103,25 @@ ScrollUtil.prototype.scrollMap = function(evt, self){
     if(this.checkTargets()){ this.sethasTargets(false) }
   }
 }
-
+/*
+* updateScrollPos
+*/
+ScrollUtil.prototype.updateScrollPos = function(){
+  this.scrollPos = (window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0)
+}
+/*
+* refreshActiveElements
+*/
+ScrollUtil.prototype.refreshActiveElements = function(){
+  this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true && e.isVisible === true; });
+}
+/*
+* Init function
+* setallElements (called once by the constructor)
+*/
 ScrollUtil.prototype.setallElements = function(){
   for (target in this.targetedElements) {
-    els = nodeListToArray(dE.querySelectorAll(target));
+    els = nodeListToArray(document.documentElement.querySelectorAll(target));
     for (index in els) {
       for (prop in this.targetedElements[target]) {
         els[index][prop] = this.targetedElements[target][prop];
@@ -115,35 +129,92 @@ ScrollUtil.prototype.setallElements = function(){
     }
     this.allElements = this.allElements.concat(els);
   }
+  els = false;
 }
-
-ScrollUtil.prototype.updateScrollPos = function(){
-  this.scrollPos = (window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0)
-}
-
-ScrollUtil.prototype.refreshActiveElements = function(){
-  this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true && e.isVisible === true; });
-}
-
+/*
+* Booleans functions
+*/
 ScrollUtil.prototype.isVisible = function(e){
   var rect = e.getBoundingClientRect();
   var viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
   return !(rect.bottom <= 0 || rect.top - viewHeight >= 0);
 }
-
 ScrollUtil.prototype.isTouchingTrigger = function(e){
   return (e.offsetTop < (e._touching.triggerLine + this.scrollPos)  && Math.round(e.offsetTop + e.clientHeight) > (e._touching.triggerLine + this.scrollPos))
 }
-
 ScrollUtil.prototype.checkTargets = function(){
   return (this.activeElements.length == 0)
 }
-
-//
-//
-//
-
+/*
+* Setter/Getter
+*/
 ScrollUtil.prototype.sethasTargets = function(bool){
   this.hasTargets = bool
 }
+
+/*
+* smoothscrolling - init if smoothScroll==true
+* (assume usage of new css scroll-behavior property, just a fallback for browsers not supporting it)
+* did not coded this part here's the src : https://gist.github.com/blinkcursor/ce3172f534777f087cf0
+* however, this is in test and may be temporary.
+ */
+ScrollUtil.prototype.smoothScrolling = {
+  init: function() {
+    var isSmoothScrollSupported = 'scrollBehavior' in document.documentElement.style;
+    if (isSmoothScrollSupported) {
+      return;
+    }
+    this.bindEvents();
+  },
+  bindEvents: function() {
+    window.addEventListener('click', this.triggerScroll.bind(this), false);
+  },
+  triggerScroll: function(event) {
+    if (event.target.hash && event.target.pathname.replace(/^\//, '') === location.pathname.replace(/^\//, '')) {
+      var target = document.getElementById(event.target.hash.slice(1)),
+        targetY = this.getElementY(target);
+      this.smoothScroll(targetY);
+    }
+  },
+  getElementY: function(element) {
+    var y = element.offsetTop,
+      node = element;
+    while (node.offsetParent && node.offsetParent !== document.body) {
+      node = node.offsetParent;
+      y += node.offsetTop;
+    }
+    return y;
+  },
+  getCurrentY: function() {
+    // Firefox, Chrome, Opera, Safari
+    if (window.self.pageYOffset) {
+      return window.self.pageYOffset;
+    }
+    // Internet Explorer 6 - standards mode
+    if (document.documentElement && document.documentElement.scrollTop) {
+      return document.documentElement.scrollTop;
+    }
+    // Internet Explorer 6, 7 and 8
+    if (document.body.scrollTop) {
+      return document.body.scrollTop;
+    }
+    return 0;
+  },
+  smoothScroll: function(targetY) {
+    var startY = this.getCurrentY(),
+      scrollBy = targetY - startY,
+      speed = Math.abs(scrollBy / 100),
+      increment = scrollBy / 25;
+
+    if (Math.abs(scrollBy) < 100) {
+      scrollTo(0, targetY);
+      return;
+    }
+    var intermediateY;
+    for (var i = 0; i <= 25; i++) {
+      intermediateY = Math.round(startY + i * increment);
+      setTimeout("window.scrollTo(0, " + intermediateY + ")", Math.round(i * speed));
+    }
+  }
+};
 
