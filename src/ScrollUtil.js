@@ -24,6 +24,7 @@ function ScrollUtil(userConfig){
   // add listener calling map function on scroll
   window.addEventListener('scroll', () => { this.scrollMap(this)  }, { capture: false, passive: true});
 }
+
 /*
 * ScrollMap
 */
@@ -35,40 +36,37 @@ ScrollUtil.prototype.scrollMap = function(self){
       if(e._visible){
         if(self.isVisible(e)){
           e.isVisible = true;
-          if(e._visible.activeStateClass){ e.classList.add(e._visible.activeStateClass);}
+          if(e._visible.activeSelector){ e.classList.add(e._visible.activeSelector);}
           if(!elementOk){ self.activeElements.push(e); elementOk = true; };
         }else{
-          if(e._visible.activeStateClass){ e.classList.remove(e._visible.activeStateClass); }
+          if(e._visible.activeSelector){ e.classList.remove(e._visible.activeSelector); }
         }
       }
       if(e._touching){
         // calculate & set trigger line if needed
-        // default value for trigger if not specified, (0 causing issues -> el doesnt take his correct state when scroll=0 & when scroll=maxScrollAvailable)
-        if(e._touching.trigger == undefined){ e._touching.trigger = 1; }
-        else{ if(e._touching.triggerLine == undefined){e._touching.triggerLine = ((self.windowHeight/100) * e._touching.trigger)} }
+        if(e._touching.triggerLine == undefined){e._touching.triggerLine = ((self.windowHeight/100) * e._touching.trigger)}
 
         if(self.isTouchingTrigger(e)){
           // found an element meeting condition to be activated
           // call function if given
           if(e._touching.funcName){ window[e._touching.funcName](e); }
-          // add activeStateClass as a css class if given or default class if not
-          if(!e._touching.activeStateClass){ e._touching.activeStateClass = 'is-touching' }
-          if(e._touching.activeStateClass){ e.classList.add(e._touching.activeStateClass); }
+          // add activeSelector as a css class if given
+          if(e._touching.activeSelector){ e.classList.add(e._touching.activeSelector); }
           // wip..
           if(e._touching.pairingWith){
             var target = document.querySelector(e._touching.pairingWith).querySelectorAll("a[href='#"+e.id+"']")[0];
-            target.classList.add(e._touching.activeStateClass);
+            target.classList.add(e._touching.activePairSelector);
           }
           // set boolean on object
           e.isTouchingTrigger = true;
           // build an array containing each elements to activate
           if(!elementOk){ self.activeElements.push(e); elementOk = true; }
         }else{
-          if(e._touching.activeStateClass){ e.classList.remove(e._touching.activeStateClass); }
+          if(e._touching.activeSelector){ e.classList.remove(e._touching.activeSelector); }
           //
           if(e._touching.pairingWith){
             var target = document.querySelector(e._touching.pairingWith).querySelectorAll("a[href='#"+e.id+"']")[0];
-            target.classList.remove(e._touching.activeStateClass);
+            target.classList.remove(e._touching.activePairSelector);
           }
         }
 
@@ -106,25 +104,25 @@ ScrollUtil.prototype.scrollMap = function(self){
 /*
 * updateScrollPos
 */
-ScrollUtil.prototype.updateScrollPos = function(){
-  this.scrollPos = (window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0)
-}
+ScrollUtil.prototype.updateScrollPos = function(){ this.scrollPos = (window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0); }
 /*
 * refreshActiveElements
 */
-ScrollUtil.prototype.refreshActiveElements = function(){
-  this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true && e.isVisible === true; });
-}
+ScrollUtil.prototype.refreshActiveElements = function(){ this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true && e.isVisible === true; }); }
 /*
 * Init function
 * setallElements (called once by the constructor)
 */
 ScrollUtil.prototype.setallElements = function(){
-  for (target in this.targetedElements) {
+  for (target in this.listen) {
+    // defaults value for _touching, get overwrited if given
+    if(this.listen[target]._touching){ this.listen[target]._touching.trigger = 1; }
+    if(this.listen[target]._touching.pairingWith && !this.listen[target]._touching.activePairSelector){ this.listen[target]._touching.activePairSelector = 'is-active'; }
+
     els = nodeListToArray(document.documentElement.querySelectorAll(target));
     for (index in els) {
-      for (prop in this.targetedElements[target]) {
-        els[index][prop] = this.targetedElements[target][prop];
+      for (prop in this.listen[target]) {
+        els[index][prop] = this.listen[target][prop];
       }
     }
     this.allElements = this.allElements.concat(els);
@@ -139,18 +137,13 @@ ScrollUtil.prototype.isVisible = function(e){
   var viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
   return !(rect.bottom <= 0 || rect.top - viewHeight >= 0);
 }
-ScrollUtil.prototype.isTouchingTrigger = function(e){
-  return (e.offsetTop < (e._touching.triggerLine + this.scrollPos)  && Math.round(e.offsetTop + e.clientHeight) > (e._touching.triggerLine + this.scrollPos))
-}
-ScrollUtil.prototype.checkTargets = function(){
-  return (this.activeElements.length == 0)
-}
+ScrollUtil.prototype.isTouchingTrigger = function(e){ return (e.offsetTop < (e._touching.triggerLine + this.scrollPos)  && Math.round(e.offsetTop + e.clientHeight) > (e._touching.triggerLine + this.scrollPos)) }
+ScrollUtil.prototype.checkTargets = function(){ return (this.activeElements.length == 0) }
+
 /*
 * Setter/Getter
 */
-ScrollUtil.prototype.sethasTargets = function(bool){
-  this.hasTargets = bool
-}
+ScrollUtil.prototype.sethasTargets = function(bool){ this.hasTargets = bool }
 
 /*
 * smoothscrolling - init if smoothScroll==true
