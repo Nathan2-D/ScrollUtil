@@ -18,87 +18,51 @@ function ScrollUtil(userConfig){
   // retrieve targeted elements / set custom properties given on configuration / store them inside this.allElements
   this.setallElements();
 
-  // call the map function once, to set elements state if needed
-  this.scrollMap(this);
-
   // add listener calling map function on scroll
-  window.addEventListener('scroll', () => { this.scrollMap(this)  }, { capture: false, passive: true});
+  if(this.listen){
+    window.addEventListener('scroll', () => { this.scrollMap(this)  }, { capture: false, passive: true});
+  }
 }
 
 /*
 * ScrollMap
 */
 ScrollUtil.prototype.scrollMap = function(self){
+  // update scroll position
   this.updateScrollPos();
+  //
   if(!self.hasTargets){
-    elementOk = false
     self.allElements.map(function(e){
-      if(e._visible){
-        if(self.isVisible(e)){
-          e.isVisible = true;
-          if(e._visible.activeSelector){ e.classList.add(e._visible.activeSelector);}
-          if(!elementOk){ self.activeElements.push(e); elementOk = true; };
-        }else{
-          if(e._visible.activeSelector){ e.classList.remove(e._visible.activeSelector); }
-        }
-      }
-      if(e._touching){
+      if(e.update && e.update == '_touching'){
         // calculate & set trigger line if needed
-        if(e._touching.triggerLine == undefined){e._touching.triggerLine = ((self.windowHeight/100) * e._touching.trigger)}
+        if(e.triggerLine == undefined){e.triggerLine = ((self.windowHeight/100) * e.trigger)}
 
-        if(self.isTouchingTrigger(e)){
-          // found an element meeting condition to be activated
-          // call function if given
-          if(e._touching.funcName){ window[e._touching.funcName](e); }
-          // add activeSelector as a css class if given
-          if(e._touching.activeSelector){ e.classList.add(e._touching.activeSelector); }
-          // wip..
-          if(e._touching.pairingWith){
-            var target = document.querySelector(e._touching.pairingWith).querySelectorAll("a[href='#"+e.id+"']")[0];
-            target.classList.add(e._touching.activePairSelector);
-          }
-          // set boolean on object
-          e.isTouchingTrigger = true;
-          // build an array containing each elements to activate
-          if(!elementOk){ self.activeElements.push(e); elementOk = true; }
-        }else{
-          if(e._touching.activeSelector){ e.classList.remove(e._touching.activeSelector); }
-          //
-          if(e._touching.pairingWith){
-            var target = document.querySelector(e._touching.pairingWith).querySelectorAll("a[href='#"+e.id+"']")[0];
-            target.classList.remove(e._touching.activePairSelector);
-          }
-        }
-
+        // build an array containing each elements to activate
+        if(self.isTouchingTrigger(e)){ self.activeElements.push(e); }
       }
-      // if(e._above){     }
-      // if(e._below){     }
     });
   }
   // if activeElements contains at least one element we can assume we have at least one target
   // so we set our boolean, to stop pushing elements in our active elements array
   if(!this.checkTargets()){ this.sethasTargets(true) }
-  // function activated one or more elements, lets first check if they still meet the condition to be active & update boolean
+
+  // function activated one or more elements, check if they still meet conditions / update boolean / dispatch corresponding event
   if(self.hasTargets){
     self.activeElements.map(function(activeElement){
-      if(activeElement._visible){
-        if(self.isVisible(activeElement)){ activeElement.isVisible = true }
-        else{ activeElement.isVisible = false }
-      }
-      if(activeElement._touching){
-        // call function if given
-        if(activeElement._touching.funcName){ window[activeElement._touching.funcName](activeElement); }
-        // check ilegibility & set boolean
-        if(self.isTouchingTrigger(activeElement)){ activeElement.isTouchingTrigger = true }
-        else{ activeElement.isTouchingTrigger = false }
+      if(activeElement.update && activeElement.update == '_touching'){
+        if(self.isTouchingTrigger(activeElement)){
+          activeElement.isTouchingTrigger = true;
+          if(activeElement.events && activeElement.events.isEligible){ self.dispatchEvent(self.createEvent(activeElement.events.isEligible, activeElement)); }
+        }else{
+          activeElement.isTouchingTrigger = false;
+          if(activeElement.events && activeElement.events.lostEligibility){ self.dispatchEvent(self.createEvent(activeElement.events.lostEligibility, activeElement)); }
+        }
       }
     });
-
     // filter activeElements array to remove each elements no longer eligible
     this.refreshActiveElements();
-
     // check if we still have targets
-    if(this.checkTargets()){ this.sethasTargets(false) }
+    if(this.checkTargets()){ this.sethasTargets(false); }
   }
 }
 /*
@@ -108,21 +72,20 @@ ScrollUtil.prototype.updateScrollPos = function(){ this.scrollPos = (window.page
 /*
 * refreshActiveElements
 */
-ScrollUtil.prototype.refreshActiveElements = function(){ this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true && e.isVisible === true; }); }
+ScrollUtil.prototype.refreshActiveElements = function(){ this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true }); }
 /*
 * Init function
 * setallElements (called once by the constructor)
 */
 ScrollUtil.prototype.setallElements = function(){
-  for (target in this.listen) {
-    // defaults value for _touching, get overwrited if given
-    if(this.listen[target]._touching){ this.listen[target]._touching.trigger = 1; }
-    if(this.listen[target]._touching.pairingWith && !this.listen[target]._touching.activePairSelector){ this.listen[target]._touching.activePairSelector = 'is-active'; }
+  for (arrIndex in this.listen) {
+    // default trigger value for trigger, get overwrited if given
+    if(this.listen[arrIndex].update == '_touching' && !this.listen[arrIndex].trigger){ this.listen[arrIndex].trigger = 1; }
 
-    els = nodeListToArray(document.documentElement.querySelectorAll(target));
+    els = nodeListToArray(document.documentElement.querySelectorAll(this.listen[arrIndex].selector));
     for (index in els) {
-      for (prop in this.listen[target]) {
-        els[index][prop] = this.listen[target][prop];
+      for (prop in this.listen[arrIndex]) {
+        els[index][prop] = this.listen[arrIndex][prop];
       }
     }
     this.allElements = this.allElements.concat(els);
@@ -131,19 +94,37 @@ ScrollUtil.prototype.setallElements = function(){
 }
 /*
 * Booleans functions
-*/
-ScrollUtil.prototype.isVisible = function(e){
-  var rect = e.getBoundingClientRect();
-  var viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
-  return !(rect.bottom <= 0 || rect.top - viewHeight >= 0);
-}
-ScrollUtil.prototype.isTouchingTrigger = function(e){ return (e.offsetTop < (e._touching.triggerLine + this.scrollPos)  && Math.round(e.offsetTop + e.clientHeight) > (e._touching.triggerLine + this.scrollPos)) }
+*///upcoming update's methods
+// ScrollUtil.prototype.isVisible = function(e){
+//   var rect = e.getBoundingClientRect();
+//   var viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
+//   return !(rect.bottom <= 0 || rect.top - viewHeight >= 0);
+// }
+ScrollUtil.prototype.isTouchingTrigger = function(e){ return (e.offsetTop < (e.triggerLine + this.scrollPos)  && Math.round(e.offsetTop + e.clientHeight) > (e.triggerLine + this.scrollPos)) }
 ScrollUtil.prototype.checkTargets = function(){ return (this.activeElements.length == 0) }
 
 /*
 * Setter/Getter
 */
 ScrollUtil.prototype.sethasTargets = function(bool){ this.hasTargets = bool }
+
+/*
+* Event creation & dispatch
+ */
+ScrollUtil.prototype.createEvent = function(eventName, element){
+  var evt = new CustomEvent(
+    eventName,
+    {
+      detail: {
+        activeElement : element
+      },
+      bubbles: true,
+      cancelable: true
+    }
+  );
+  return evt;
+}
+ScrollUtil.prototype.dispatchEvent = function(evt){ window.dispatchEvent(evt); }
 
 /*
 * smoothscrolling - init if smoothScroll==true
@@ -210,4 +191,3 @@ ScrollUtil.prototype.smoothScrolling = {
     }
   }
 };
-
