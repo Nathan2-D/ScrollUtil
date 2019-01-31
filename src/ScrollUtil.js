@@ -30,21 +30,29 @@ function ScrollUtil(userConfig){
 ScrollUtil.prototype.scrollMap = function(self){
   // update scroll position
   this.updateScrollPos();
-  //
+  // We dont have targets, lets map on allElements[] to find some.
   if(!self.hasTargets){
     self.allElements.map(function(e){
       if(e.update && e.update == '_touching'){
         // calculate & set trigger line if needed
         if(e.triggerLine == undefined){e.triggerLine = ((self.windowHeight/100) * e.trigger)}
-
-        // build an array containing each elements to activate
-        if(self.isTouchingTrigger(e)){ self.activeElements.push(e); }
+        // testing conditions
+        if(self.isTouchingTrigger(e)){
+          // set boolean so this dont get removed from activeElements[] when checkTargets() occurs
+          e.isTouchingTrigger = true;
+          // build array containing each elements to activate
+          self.activeElements.push(e);
+        }
       }
     });
   }
-  // if activeElements contains at least one element we can assume we have at least one target
-  // so we set our boolean, to stop pushing elements in our active elements array
-  if(!this.checkTargets()){ this.sethasTargets(true) }
+
+  // filter activeElements array to remove each elements no longer eligible
+  this.refreshActiveElements();
+
+  // if activeElements[] contains at least one element at this point, we assume we have at least one eligible target
+  // so we set our boolean, to stop mapping on all elements and we'll map on our activeElements[] instead.
+  if(!this.checkTargets()){ this.sethasTargets(true); }// }
 
   // function activated one or more elements, check if they still meet conditions / update boolean / dispatch corresponding event
   if(self.hasTargets){
@@ -56,12 +64,12 @@ ScrollUtil.prototype.scrollMap = function(self){
         }else{
           activeElement.isTouchingTrigger = false;
           if(activeElement.events && activeElement.events.lostEligibility){ self.dispatchEvent(self.createEvent(activeElement.events.lostEligibility, activeElement)); }
+
         }
       }
     });
-    // filter activeElements array to remove each elements no longer eligible
-    this.refreshActiveElements();
-    // check if we still have targets
+
+    // check if we still have targets (could be somewhere else, not sure this is the best option)
     if(this.checkTargets()){ this.sethasTargets(false); }
   }
 }
@@ -71,6 +79,7 @@ ScrollUtil.prototype.scrollMap = function(self){
 ScrollUtil.prototype.updateScrollPos = function(){ this.scrollPos = (window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0); }
 /*
 * refreshActiveElements
+* remove !e.isTouchingTrigger elements from activeElements[]
 */
 ScrollUtil.prototype.refreshActiveElements = function(){ this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true }); }
 /*
@@ -79,9 +88,14 @@ ScrollUtil.prototype.refreshActiveElements = function(){ this.activeElements = t
 */
 ScrollUtil.prototype.setallElements = function(){
   for (arrIndex in this.listen) {
-    // default trigger value for trigger, get overwrited if given
+    // default trigger value for trigger, get overwrited if given (obvs, should change this.. )
     if(this.listen[arrIndex].update == '_touching' && !this.listen[arrIndex].trigger){ this.listen[arrIndex].trigger = 1; }
 
+    // basically
+    // 1.get all elements we need to 'listen' in arrays (yes/no)
+    // 2.copy prop/value declared for elementd
+    // 3.concatenate arrays into one and send it to this.allElements[]
+    // nb: also set the variables used to query & store all elements to false (not sure this is useful, maybe there is some kind of garbage collecting happening, idk..)
     els = nodeListToArray(document.documentElement.querySelectorAll(this.listen[arrIndex].selector));
     for (index in els) {
       for (prop in this.listen[arrIndex]) {
@@ -100,14 +114,16 @@ ScrollUtil.prototype.setallElements = function(){
 //   var viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
 //   return !(rect.bottom <= 0 || rect.top - viewHeight >= 0);
 // }
-ScrollUtil.prototype.isTouchingTrigger = function(e){ return (e.offsetTop < (e.triggerLine + this.scrollPos)  && Math.round(e.offsetTop + e.clientHeight) > (e.triggerLine + this.scrollPos)) }
-ScrollUtil.prototype.checkTargets = function(){ return (this.activeElements.length == 0) }
 
+// return true if e isTouchingTrigger
+ScrollUtil.prototype.isTouchingTrigger = function(e){ return (e.offsetTop < (e.triggerLine + this.scrollPos)  && Math.round(e.offsetTop + e.clientHeight) > (e.triggerLine + this.scrollPos)) }
+
+// return true when no target
+ScrollUtil.prototype.checkTargets = function(){ return (this.activeElements.length == 0) }
 /*
 * Setter/Getter
 */
 ScrollUtil.prototype.sethasTargets = function(bool){ this.hasTargets = bool }
-
 /*
 * Event creation & dispatch
  */
@@ -118,7 +134,7 @@ ScrollUtil.prototype.createEvent = function(eventName, element){
       detail: {
         activeElement : element
       },
-      bubbles: true,
+      bubbles: false,
       cancelable: true
     }
   );
