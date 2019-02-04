@@ -1,118 +1,178 @@
-var defaultConfig = {
+let defaultConfig = {
   'windowWidth' :  window.innerWidth|| document.documentElement.clientWidth|| document.documentElement.getElementsByTagName('body')[0].clientWidth,
   'windowHeight' :  window.innerHeight|| document.documentElement.clientHeight|| document.documentElement.getElementsByTagName('body')[0].clientHeight,
+  'ticking' : false,
   'hasTargets' : false,
   'allElements' : [],
+  'slimmedAllElements' : [],
   'activeElements' : []
 }
-const nodeListToArray = nodeList => [...nodeList];
+let rAF = window.requestAnimationFrame ||
+    window.webkitRequestAnimationFrame ||
+    window.mozRequestAnimationFrame ||
+    window.msRequestAnimationFrame ||
+    window.oRequestAnimationFrame
+const nodeListToArray = nodeList => [...nodeList]
+
 
 function ScrollUtil(userConfig){
+  this.init(userConfig)
+}
+/*
+* [1] set all elements
+ */
+ScrollUtil.prototype.init = function(userConfig){
   // 'import' default & user config
   for (dC in defaultConfig) { this[dC] = defaultConfig[dC] }
   for (uC in userConfig) { this[uC] = userConfig[uC] }
 
   // set smoothScroll if needed
-  if(this.smoothScroll){ this.smoothScrolling.init(); }
+  if(this.smoothScroll){ this.smoothScrolling.init() }
 
   // retrieve targeted elements / set custom properties given on configuration / store them inside this.allElements
-  this.setallElements();
+  // create slimmed clone of this.allElements for mapping purpose
+  this.setallElements()
 
   // add listener calling map function on scroll
+  this.addListener()
+}
+/*
+* [2] Add listener
+ */
+ScrollUtil.prototype.addListener = function(){
   if(this.listen){
-    window.addEventListener('scroll', () => { this.scrollMap(this)  }, { capture: false, passive: true});
+    window.addEventListener('scroll', () => { this.scrolling()  }, { capture: false, passive: true})
   }
 }
 
 /*
 * ScrollMap
 */
-ScrollUtil.prototype.scrollMap = function(self){
+ScrollUtil.prototype.scrolling = function(){
+  this.ticking = false
   // update scroll position
-  this.updateScrollPos();
+  this.updateScrollPos()
+  let lastScrollValue = this.scrollPos
+
+  this.requestTick()
+}
+ScrollUtil.prototype.requestTick = function(){
+  if(!this.ticking){
+    self = this
+    rAF(function(){ self.scrollMap(self) })
+  }
+  this.ticking = true
+}
+ScrollUtil.prototype.scrollMap = function(self){
   // We dont have targets, lets map on allElements[] to find some.
   if(!self.hasTargets){
-    self.allElements.map(function(e){
+    self.slimmedAllElements.map(function(e){
       if(e.update && e.update == '_touching'){
         // calculate & set trigger line if needed
         if(e.triggerLine == undefined){e.triggerLine = ((self.windowHeight/100) * e.trigger)}
         // testing conditions
         if(self.isTouchingTrigger(e)){
-          // set boolean so this dont get removed from activeElements[] when checkTargets() occurs
-          e.isTouchingTrigger = true;
+          // set boolean so self dont get removed from activeElements[] when checkTargets() occurs
+          e.isTouchingTrigger = true
+          // dispatch event once from here
+          self.dispatchEvent(self.createEvent(e.events.isEligible, e))
           // build array containing each elements to activate
-          self.activeElements.push(e);
+          self.activeElements.push(e)
         }
       }
-    });
+    })
   }
 
-  // filter activeElements array to remove each elements no longer eligible
-  this.refreshActiveElements();
+  // check the length of activeElements array to determine wether we still have activated elements or not
+  !self.checkTargets() ? self.sethasTargets(true) : self.sethasTargets(false)
 
-  // if activeElements[] contains at least one element at this point, we assume we have at least one eligible target
-  // so we set our boolean, to stop mapping on all elements and we'll map on our activeElements[] instead.
-  if(!this.checkTargets()){ this.sethasTargets(true); }// }
-
-  // function activated one or more elements, check if they still meet conditions / update boolean / dispatch corresponding event
+  // function activated one or more elements, check if they still meet conditions / update boolean / dispatch corresponding events
   if(self.hasTargets){
     self.activeElements.map(function(activeElement){
       if(activeElement.update && activeElement.update == '_touching'){
         if(self.isTouchingTrigger(activeElement)){
-          activeElement.isTouchingTrigger = true;
-          if(activeElement.events && activeElement.events.isEligible){ self.dispatchEvent(self.createEvent(activeElement.events.isEligible, activeElement)); }
+          activeElement.isTouchingTrigger = true
+          if(activeElement.events && activeElement.events.isEligible){
+            self.dispatchEvent(self.createEvent(activeElement.events.isEligible, activeElement))
+          }
         }else{
-          activeElement.isTouchingTrigger = false;
-          if(activeElement.events && activeElement.events.lostEligibility){ self.dispatchEvent(self.createEvent(activeElement.events.lostEligibility, activeElement)); }
+          activeElement.isTouchingTrigger = false
+          if(activeElement.events && activeElement.events.lostEligibility){
+            self.dispatchEvent(self.createEvent(activeElement.events.lostEligibility, activeElement))
+          }
 
         }
       }
-    });
+    })
 
-    // check if we still have targets (could be somewhere else, not sure this is the best option)
-    if(this.checkTargets()){ this.sethasTargets(false); }
+    // filter activeElements array to remove each elements no longer eligible
+    self.refreshActiveElements()
   }
 }
 /*
 * updateScrollPos
 */
-ScrollUtil.prototype.updateScrollPos = function(){ this.scrollPos = (window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0); }
+ScrollUtil.prototype.updateScrollPos = function(){ this.scrollPos = (window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0) }
 /*
 * refreshActiveElements
 * remove !e.isTouchingTrigger elements from activeElements[]
 */
-ScrollUtil.prototype.refreshActiveElements = function(){ this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true }); }
+ScrollUtil.prototype.refreshActiveElements = function(){ this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true }) }
 /*
 * Init function
 * setallElements (called once by the constructor)
 */
 ScrollUtil.prototype.setallElements = function(){
+    // this function does too much..
+    // 1.get all elements we need to 'listen' in arrays
+    // 2.copy all prop/value in given listen property directly on elements
+    // 3.concatenate arrays into one and send it to this.allElements[]
+    // 4.calling slimmingMirror() to set a 'slimmed' version for mapping purpose
   for (arrIndex in this.listen) {
     // default trigger value for trigger, get overwrited if given (obvs, should change this.. )
-    if(this.listen[arrIndex].update == '_touching' && !this.listen[arrIndex].trigger){ this.listen[arrIndex].trigger = 1; }
+    if(this.listen[arrIndex].update == '_touching' && !this.listen[arrIndex].trigger){ this.listen[arrIndex].trigger = 1 }
 
-    // basically
-    // 1.get all elements we need to 'listen' in arrays (yes/no)
-    // 2.copy prop/value declared for elementd
-    // 3.concatenate arrays into one and send it to this.allElements[]
-    // nb: also set the variables used to query & store all elements to false (not sure this is useful, maybe there is some kind of garbage collecting happening, idk..)
-    els = nodeListToArray(document.documentElement.querySelectorAll(this.listen[arrIndex].selector));
+    els = nodeListToArray(document.documentElement.querySelectorAll(this.listen[arrIndex].selector))
     for (index in els) {
       for (prop in this.listen[arrIndex]) {
-        els[index][prop] = this.listen[arrIndex][prop];
+        els[index][prop] = this.listen[arrIndex][prop]
       }
     }
-    this.allElements = this.allElements.concat(els);
+    this.allElements = this.allElements.concat(els)
   }
-  els = false;
+  // set a slim version to use for mapping
+  if(this.slimmingMirror(this.allElements)){
+    this.slimmedAllElements = this.slimmingMirror(this.allElements)
+  }
+  els = false
 }
+// garbageeeee
+//
+ScrollUtil.prototype.slimmingMirror = function(arr){
+  let items = []
+  let i = 0
+  arr.map(function(e){
+      items[i] = {}
+      items[i].id = e.id
+      items[i].offsetTop = e.offsetTop
+      items[i].clientHeight = e.clientHeight
+      items[i].selector = e.selector
+      items[i].update = e.update
+      items[i].trigger = e.trigger
+      items[i].events = e.events
+    i++
+  })
+  if(items.length === this.allElements.length){return items}else{return false} // issues w/ 'return items' when using shorthand js ??
+}
+
+
 /*
 * Booleans functions
 *///upcoming update's methods
 // ScrollUtil.prototype.isVisible = function(e){
-//   var rect = e.getBoundingClientRect();
-//   var viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
-//   return !(rect.bottom <= 0 || rect.top - viewHeight >= 0);
+//   let rect = e.getBoundingClientRect()
+//   let viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight)
+//   return !(rect.bottom <= 0 || rect.top - viewHeight >= 0)
 // }
 
 // return true if e isTouchingTrigger
@@ -128,7 +188,7 @@ ScrollUtil.prototype.sethasTargets = function(bool){ this.hasTargets = bool }
 * Event creation & dispatch
  */
 ScrollUtil.prototype.createEvent = function(eventName, element){
-  var evt = new CustomEvent(
+  let evt = new CustomEvent(
     eventName,
     {
       detail: {
@@ -137,10 +197,10 @@ ScrollUtil.prototype.createEvent = function(eventName, element){
       bubbles: false,
       cancelable: true
     }
-  );
-  return evt;
+  )
+  return evt
 }
-ScrollUtil.prototype.dispatchEvent = function(evt){ window.dispatchEvent(evt); }
+ScrollUtil.prototype.dispatchEvent = function(evt){ window.dispatchEvent(evt) }
 
 /*
 * smoothscrolling - init if smoothScroll==true
@@ -150,60 +210,60 @@ ScrollUtil.prototype.dispatchEvent = function(evt){ window.dispatchEvent(evt); }
  */
 ScrollUtil.prototype.smoothScrolling = {
   init: function() {
-    var isSmoothScrollSupported = 'scrollBehavior' in document.documentElement.style;
+    let isSmoothScrollSupported = 'scrollBehavior' in document.documentElement.style
     if (isSmoothScrollSupported) {
-      return;
+      return
     }
-    this.bindEvents();
+    this.bindEvents()
   },
   bindEvents: function() {
-    window.addEventListener('click', this.triggerScroll.bind(this), false);
+    window.addEventListener('click', this.triggerScroll.bind(this), false)
   },
   triggerScroll: function(event) {
     if (event.target.hash && event.target.pathname.replace(/^\//, '') === location.pathname.replace(/^\//, '')) {
-      var target = document.getElementById(event.target.hash.slice(1)),
-        targetY = this.getElementY(target);
-      this.smoothScroll(targetY);
+      let target = document.getElementById(event.target.hash.slice(1)),
+        targetY = this.getElementY(target)
+      this.smoothScroll(targetY)
     }
   },
   getElementY: function(element) {
-    var y = element.offsetTop,
-      node = element;
+    let y = element.offsetTop,
+      node = element
     while (node.offsetParent && node.offsetParent !== document.body) {
-      node = node.offsetParent;
-      y += node.offsetTop;
+      node = node.offsetParent
+      y += node.offsetTop
     }
-    return y;
+    return y
   },
   getCurrentY: function() {
     // Firefox, Chrome, Opera, Safari
     if (window.self.pageYOffset) {
-      return window.self.pageYOffset;
+      return window.self.pageYOffset
     }
     // Internet Explorer 6 - standards mode
     if (document.documentElement && document.documentElement.scrollTop) {
-      return document.documentElement.scrollTop;
+      return document.documentElement.scrollTop
     }
     // Internet Explorer 6, 7 and 8
     if (document.body.scrollTop) {
-      return document.body.scrollTop;
+      return document.body.scrollTop
     }
-    return 0;
+    return 0
   },
   smoothScroll: function(targetY) {
-    var startY = this.getCurrentY(),
+    let startY = this.getCurrentY(),
       scrollBy = targetY - startY,
       speed = Math.abs(scrollBy / 100),
-      increment = scrollBy / 25;
+      increment = scrollBy / 25
 
     if (Math.abs(scrollBy) < 100) {
-      scrollTo(0, targetY);
-      return;
+      scrollTo(0, targetY)
+      return
     }
-    var intermediateY;
-    for (var i = 0; i <= 25; i++) {
-      intermediateY = Math.round(startY + i * increment);
-      setTimeout("window.scrollTo(0, " + intermediateY + ")", Math.round(i * speed));
+    let intermediateY
+    for (let i = 0; i <= 25; i++) {
+      intermediateY = Math.round(startY + i * increment)
+      setTimeout("window.scrollTo(0, " + intermediateY + ")", Math.round(i * speed))
     }
   }
-};
+}

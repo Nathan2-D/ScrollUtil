@@ -16,34 +16,30 @@ git clone https://github.com/Nathan2-D/ScrollUtil.git
 
 ## Options
 
+##### CURRENT OPTIONS
+
+**SmoothScroll** : *(optional/default:false)* -> assume usage of new 'scroll-behavior' css property and fallback for browsers not supporting it
+  **listen** :  -> array of objects representing elements SU will track while scroll happen and their configurations :
+  **selector** : *(required)* -
+    SU will track all these elements and update their state based on update
+ **update** :
+   *(activation logic)* eg : if ```_touching```, element is active only when touching the computed trigger line
+ **trigger** *(optional/default:1)*
+    represent a percentage of available window height, used to calculate trigger line. like so: ``` triggerLine = (windowHeight/100)*trigger) ```
+ **events** :
+      -isEligible : name of the event fired when element meet condition
+      -lostEligibility : name of the event fired when element lost eligibility (noway)
+
+##### INCOMING
+-  offset for fixed nav (any direction)
+-  allow multiples selector and updates methods (pipe?) (eg: ```'update' : '_visible|_touching'```)
+
+
+
+## Template for testing (emmet)
+
 ```
-/*
-  * CURRENT OPTIONS
-   */
-
-  // smoothScroll : (optional/default:false)
-  //    -> this assume usage of new 'scroll-behavior' css property and fallback for browsers not supporting it
-  // listen :
-  //    -> array of objects representing elements SU will track while scroll happen and their configurations
-  // selector : (required) -
-  //    -> SU will track all these elements and update their state based on update
-  // update :
-  //    -> (activation logic) eg : if _touching, element is active only when touching the computed trigger line
-  // trigger(optional/default:1)
-  //    -> represent a percentage of available window height, used to calculate trigger line. like so: triggerLine = (windowHeight/100)*trigger)
-  // events :
-  //    -> obj contain :
-  //      _>isEligible : name of the event fired when element meet condition
-  //      _>lostEligibility : name of the event fired when element lost eligibility (noway)
-
-/*
-  * INCOMING
-   */
-
-  //  offset for fixed nav (in any direction?)
-  //  allow multiples selector and updates methods (array/or pipe?) (eg pipe: 'update' : '_visible|_touching')
-  // research on evt deleg/bubbling/propag to find the best solutions
-  // (could every evts run in a blackbox sort of things?)
+!>.container>(#nav>ul>li*12>a[href=#section$]{Section $})+section.myCssClass#section$*12
 ```
 
 ## Init
@@ -51,12 +47,12 @@ git clone https://github.com/Nathan2-D/ScrollUtil.git
 var test = new ScrollUtil({
   'smoothScroll' : true,
   'listen' : [
-    {'selector' : '.myCssClass', 'update' : '_touching', 'trigger' : 50, 'events' : {'isEligible' : 'myCustomEvent', 'lostEligibility' : 'myOtherCustomEvent'} },
-    //{'selector' : '.myOtherCssClass', 'update' : '_visible' }
+    {'selector' : '.myCssClass', 'update' : '_touching', 'trigger' : 50, 'events' : {'isEligible' : 'myCustomEvent', 'lostEligibility' : 'myOtherCustomEvent'} }
   ]
 });
 ```
 ## Listening Custom Events
+
 ```
 // happen when elements is eligible
   window.addEventListener('myCustomEvent', (e) => {
@@ -81,5 +77,5 @@ var test = new ScrollUtil({
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE) file for details
 
