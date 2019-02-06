@@ -34,9 +34,12 @@
   <section class="myCssClass" id="section10"></section>
 
   <div class="line"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.9.1/underscore-min.js"></script>
   <script src="../src/ScrollUtil.js" ></script>
   <script>
-    var test = new ScrollUtil({
+    let i =0
+    let curr
+    let test = new ScrollUtil({
       'smoothScroll' : true,
       'listen' : [
         {'selector' : '.myCssClass', 'update' : '_touching', 'trigger' : 50, 'events' : {'isEligible' : 'myCustomEvent', 'lostEligibility' : 'myOtherCustomEvent'} }
@@ -45,24 +48,28 @@
 
     // happen when elements is eligible
     window.addEventListener('myCustomEvent', (e) => {
-      elem = e.detail.activeElement;
-      console.log('Throwing isEligible event for  '+elem.id+'')
-      if(typeof elem.pair == 'undefined'){
-        elem.pair = document.getElementById('nav').querySelectorAll("a[href='#"+elem.id+"']")[0];
+      if(!curr){
+        curr = e.detail.activeElement
       }
-      elem.pair.classList.add('is-active');
+      // we change target when we receive a new one
+      if(curr != e.detail.activeElement){
+        curr = e.detail.activeElement
+        i = 0
+      }
+      curr.getPair().classList.add('is-active')
+      console.log(i)
+      i++
     });
 
     // happen when element lost eligibility
     window.addEventListener('myOtherCustomEvent', (e) => {
-      elem = e.detail.activeElement;
-      console.log('Throwing lostEligibility event for  '+elem.id+'')
-      if(typeof elem.pair != 'undefined'){elem.pair.classList.remove('is-active');}
+        elem = e.detail.activeElement
+        elem.getPair().classList.remove('is-active')
     });
-    // scrollPos = ((window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0));
-    // relativeScroll = Math.abs(e.offsetTop - (scrollPos));
+    // scrollPos = ((window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0))
+    // relativeScroll = Math.abs(e.offsetTop - (scrollPos))
     // // e.clientHeight/2 because trigger at 50%
-    // inPercent = Math.round((relativeScroll / (e.clientHeight/2)) * 100);
+    // inPercent = Math.round((relativeScroll / (e.clientHeight/2)) * 100)
   </script>
 </body>
 </html>

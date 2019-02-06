@@ -7,6 +7,7 @@ let defaultConfig = {
   'slimmedAllElements' : [],
   'activeElements' : []
 }
+let dataNeeded = ['id', 'listen', 'clientHeight', 'offsetTop']
 let rAF = window.requestAnimationFrame ||
     window.webkitRequestAnimationFrame ||
     window.mozRequestAnimationFrame ||
@@ -14,12 +15,32 @@ let rAF = window.requestAnimationFrame ||
     window.oRequestAnimationFrame
 const nodeListToArray = nodeList => [...nodeList]
 
-
+// ScrollUtil constructor
 function ScrollUtil(userConfig){
   this.init(userConfig)
 }
+
+// Element constructor
+function Element(element){
+  // use of underscore.js _.pick function to keep only properties we need
+  // not sure this is useful, basic idea is to 'slim' all objects so they're less heavy for the mapping function..
+  // .. currently just keeping id as a reference to the html object, not sure how i want to do this..
+  // maybe generate and add one if none specified on 'listened' elements? ..
+  // or find another way to retrieve the full object within the DOM when we in need of it.
+  this.element = _.pick(element, dataNeeded)
+
+  // default value for trigger
+  if(!this.element.listen.trigger){this.element.listen.trigger = 1}
+
+  return this
+}
+
+// Element prototype getPair
+Element.prototype.getPair = function(){
+  return document.querySelectorAll("a[href='#"+this.element.id+"']")[0];
+}
 /*
-* [1] set all elements
+* [1] init
  */
 ScrollUtil.prototype.init = function(userConfig){
   // 'import' default & user config
@@ -44,38 +65,36 @@ ScrollUtil.prototype.addListener = function(){
     window.addEventListener('scroll', () => { this.scrolling()  }, { capture: false, passive: true})
   }
 }
-
 /*
-* ScrollMap
+* Scroll
 */
 ScrollUtil.prototype.scrolling = function(){
   this.ticking = false
   // update scroll position
   this.updateScrollPos()
-  let lastScrollValue = this.scrollPos
 
   this.requestTick()
 }
 ScrollUtil.prototype.requestTick = function(){
   if(!this.ticking){
     self = this
-    rAF(function(){ self.scrollMap(self) })
+    self.scrollMap(self)
   }
   this.ticking = true
 }
 ScrollUtil.prototype.scrollMap = function(self){
   // We dont have targets, lets map on allElements[] to find some.
   if(!self.hasTargets){
-    self.slimmedAllElements.map(function(e){
-      if(e.update && e.update == '_touching'){
+    self.allElements.map(function(e){
+      if(e.element.listen.update && e.element.listen.update == '_touching'){
         // calculate & set trigger line if needed
-        if(e.triggerLine == undefined){e.triggerLine = ((self.windowHeight/100) * e.trigger)}
+        if(e.element.listen.triggerLine == undefined){e.element.listen.triggerLine = ((self.windowHeight/100) * e.element.listen.trigger)}
         // testing conditions
-        if(self.isTouchingTrigger(e)){
-          // set boolean so self dont get removed from activeElements[] when checkTargets() occurs
-          e.isTouchingTrigger = true
+        if(self.isTouchingTrigger(e.element)){
+          // set boolean so this dont get removed from activeElements[] when checkTargets() occurs
+          e.element.isTouchingTrigger = true
           // dispatch event once from here
-          self.dispatchEvent(self.createEvent(e.events.isEligible, e))
+          self.dispatchEvent(self.createEvent(e.element.listen.events.isEligible, e))
           // build array containing each elements to activate
           self.activeElements.push(e)
         }
@@ -89,104 +108,62 @@ ScrollUtil.prototype.scrollMap = function(self){
   // function activated one or more elements, check if they still meet conditions / update boolean / dispatch corresponding events
   if(self.hasTargets){
     self.activeElements.map(function(activeElement){
-      if(activeElement.update && activeElement.update == '_touching'){
-        if(self.isTouchingTrigger(activeElement)){
-          activeElement.isTouchingTrigger = true
-          if(activeElement.events && activeElement.events.isEligible){
-            self.dispatchEvent(self.createEvent(activeElement.events.isEligible, activeElement))
+      if(activeElement.element.listen.update && activeElement.element.listen.update == '_touching'){
+        if(self.isTouchingTrigger(activeElement.element)){
+          activeElement.element.isTouchingTrigger = true
+          if(activeElement.element.listen.events && activeElement.element.listen.events.isEligible){
+            self.dispatchEvent(self.createEvent(activeElement.element.listen.events.isEligible, activeElement))
           }
         }else{
-          activeElement.isTouchingTrigger = false
-          if(activeElement.events && activeElement.events.lostEligibility){
-            self.dispatchEvent(self.createEvent(activeElement.events.lostEligibility, activeElement))
+          activeElement.element.isTouchingTrigger = false
+          if(activeElement.element.listen.events && activeElement.element.listen.events.lostEligibility){
+            self.dispatchEvent(self.createEvent(activeElement.element.listen.events.lostEligibility, activeElement))
           }
-
         }
       }
     })
 
     // filter activeElements array to remove each elements no longer eligible
-    self.refreshActiveElements()
+   self.refreshActiveElements()
   }
 }
-/*
-* updateScrollPos
-*/
-ScrollUtil.prototype.updateScrollPos = function(){ this.scrollPos = (window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0) }
-/*
-* refreshActiveElements
-* remove !e.isTouchingTrigger elements from activeElements[]
-*/
-ScrollUtil.prototype.refreshActiveElements = function(){ this.activeElements = this.activeElements.filter(function(e){ return e.isTouchingTrigger === true }) }
-/*
-* Init function
-* setallElements (called once by the constructor)
-*/
-ScrollUtil.prototype.setallElements = function(){
-    // this function does too much..
-    // 1.get all elements we need to 'listen' in arrays
-    // 2.copy all prop/value in given listen property directly on elements
-    // 3.concatenate arrays into one and send it to this.allElements[]
-    // 4.calling slimmingMirror() to set a 'slimmed' version for mapping purpose
-  for (arrIndex in this.listen) {
-    // default trigger value for trigger, get overwrited if given (obvs, should change this.. )
-    if(this.listen[arrIndex].update == '_touching' && !this.listen[arrIndex].trigger){ this.listen[arrIndex].trigger = 1 }
 
+// update scroll position
+ScrollUtil.prototype.updateScrollPos = function(){ this.scrollPos = (window.pageYOffset || document.documentElement.scrollTop)  - (document.documentElement.clientTop || 0) }
+
+// remove !e.isTouchingTrigger elements from activeElements[]
+ScrollUtil.prototype.refreshActiveElements = function(){ this.activeElements = this.activeElements.filter(function(e){ return e.element.isTouchingTrigger === true }) }
+
+// 1.query all elements targeted by 'listen.selector' in arrays
+// 2.copy 'listen' config given directly on targeted object
+// 3.instanciate this.allElements[] with the concatenation of all arrays
+// 4.calling Element constructor for each element in this array.
+ScrollUtil.prototype.setallElements = function(){
+  for (arrIndex in this.listen) {
     els = nodeListToArray(document.documentElement.querySelectorAll(this.listen[arrIndex].selector))
     for (index in els) {
-      for (prop in this.listen[arrIndex]) {
-        els[index][prop] = this.listen[arrIndex][prop]
-      }
+      els[index].listen = this.listen[arrIndex]
     }
     this.allElements = this.allElements.concat(els)
   }
-  // set a slim version to use for mapping
-  if(this.slimmingMirror(this.allElements)){
-    this.slimmedAllElements = this.slimmingMirror(this.allElements)
+  for (arrIndex in this.allElements) {
+    this.allElements[arrIndex] = new Element(this.allElements[arrIndex])
   }
   els = false
 }
-// garbageeeee
-//
-ScrollUtil.prototype.slimmingMirror = function(arr){
-  let items = []
-  let i = 0
-  arr.map(function(e){
-      items[i] = {}
-      items[i].id = e.id
-      items[i].offsetTop = e.offsetTop
-      items[i].clientHeight = e.clientHeight
-      items[i].selector = e.selector
-      items[i].update = e.update
-      items[i].trigger = e.trigger
-      items[i].events = e.events
-    i++
-  })
-  if(items.length === this.allElements.length){return items}else{return false} // issues w/ 'return items' when using shorthand js ??
+
+// return true if element is touching the computed trigger line.
+ScrollUtil.prototype.isTouchingTrigger = function(e){
+  return (e.offsetTop < (e.listen.triggerLine + this.scrollPos)  && Math.round(e.offsetTop + e.clientHeight) > (e.listen.triggerLine + this.scrollPos))
 }
 
-
-/*
-* Booleans functions
-*///upcoming update's methods
-// ScrollUtil.prototype.isVisible = function(e){
-//   let rect = e.getBoundingClientRect()
-//   let viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight)
-//   return !(rect.bottom <= 0 || rect.top - viewHeight >= 0)
-// }
-
-// return true if e isTouchingTrigger
-ScrollUtil.prototype.isTouchingTrigger = function(e){ return (e.offsetTop < (e.triggerLine + this.scrollPos)  && Math.round(e.offsetTop + e.clientHeight) > (e.triggerLine + this.scrollPos)) }
-
-// return true when no target
+// return true if no target
 ScrollUtil.prototype.checkTargets = function(){ return (this.activeElements.length == 0) }
-/*
-* Setter/Getter
-*/
+
+// 'main boolean' does the script have activated target or not?
 ScrollUtil.prototype.sethasTargets = function(bool){ this.hasTargets = bool }
-/*
-* Event creation & dispatch
- */
+
+// event creation
 ScrollUtil.prototype.createEvent = function(eventName, element){
   let evt = new CustomEvent(
     eventName,
@@ -200,6 +177,7 @@ ScrollUtil.prototype.createEvent = function(eventName, element){
   )
   return evt
 }
+// event dispatch
 ScrollUtil.prototype.dispatchEvent = function(evt){ window.dispatchEvent(evt) }
 
 /*
@@ -267,3 +245,4 @@ ScrollUtil.prototype.smoothScrolling = {
     }
   }
 }
+

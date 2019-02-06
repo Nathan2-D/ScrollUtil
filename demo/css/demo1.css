@@ -47,4 +47,4 @@ section{transition: background .5s ease-in;}
 section.element-is-active{
   background:#ffcbfd;
 }
-.line{content:"";display: block;width: 100%;position: fixed;top: 0%;height: 1px;background:red;left: 0;right: 0;}
+.line{content:"";display: block;width: 100%;position: fixed;top: 50%;height: 1px;background:red;left: 0;right: 0;}
