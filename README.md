@@ -4,7 +4,7 @@
 
 >__pull request welcome ;)__
 
-[https://codepen.io/Nathan-D/full/XOgryL](basic scrollspy))
+[basic scrollspy](https://codepen.io/Nathan-D/full/XOgryL))
 
 ## Getting Started
 
