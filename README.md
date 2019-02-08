@@ -4,6 +4,8 @@
 
 >__pull request welcome ;)__
 
+[https://codepen.io/Nathan-D/full/XOgryL](basic scrollspy))
+
 ## Getting Started
 
 Clone this repository
@@ -54,22 +56,25 @@ var test = new ScrollUtil({
 ## Listening Custom Events
 
 ```
+let curr
 // happen when elements is eligible
-  window.addEventListener('myCustomEvent', (e) => {
-    elem = e.detail.activeElement;
-    console.log('Throwing isEligible event for  '+elem.id+'')
-    if(typeof elem.pair == 'undefined'){
-      elem.pair = document.querySelector('.nav').querySelectorAll("a[href='#"+elem.id+"']")[0];
-    }
-    elem.pair.classList.add('is-active');
-  });
+window.addEventListener('myCustomEvent', (e) => {
+  if(!curr){
+    curr = e.detail.activeElement
+  }
+  // change target when we receive a new one
+  if(curr != e.detail.activeElement){
+    curr = e.detail.activeElement
+  }
+  // getPair() Element methods / retrieve (href)targeting element
+  curr.getPair().classList.add('is-active')
+});
 
-  // happen when element lost eligibility
-  window.addEventListener('myOtherCustomEvent', (e) => {
-    elem = e.detail.activeElement;
-    console.log('Throwing lostEligibility event for  '+elem.id+'')
-    if(typeof elem.pair != 'undefined'){elem.pair.classList.remove('is-active');}
-  });
+// happen when element lost eligibility
+window.addEventListener('myOtherCustomEvent', (e) => {
+  elem = e.detail.activeElement
+  elem.getPair().classList.remove('is-active')
+});
 ```
 ## Authors
 
